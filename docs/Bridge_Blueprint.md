@@ -38,5 +38,6 @@ The **dt-bridge** (Frontal Lobe) is the high-rank orchestrator of the Deepthough
 - [x] Initialize Git and GitHub Repository.
 - [x] Implement `KolibriTopicExtractor` (KuzuDB).
 - [x] Implement `TranscriptVectorizer` (LanceDB).
-- [ ] Finalize LangGraph `Librarian` node integration.
-- [ ] Implement `Assessor` node to consume `dt-contracts` telemetry schemas.
+- [x] Finalize LangGraph `Librarian` node integration.
+- [x] Implement `Assessor` node to consume `dt-contracts` telemetry schemas.
+- [x] Integrate full multi-agent Roundtable (Librarian, Assessor, Foreman).
