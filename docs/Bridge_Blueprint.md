@@ -3,15 +3,13 @@
 **Status:** Active Development  
 
 ## Vision
-The **dt-bridge** (Frontal Lobe) is the high-rank orchestrator of the Deepthought Educational OS. Residing on the Mac Studio (The Principal), it transforms raw, static educational data from the Kolibri ecosystem into proactive, AI-tutored intelligence payloads. It is the "brain" that bridges ground-truth pedagogy with active heutagogical creation.
+The **dt-bridge** is a standalone **Kolibri Graph RAG Repository**. It serves as a specialized knowledge base that extracts, structures, and indexes the entirety of Kolibri's educational content (Topic Trees, Transcripts, and Metadata). It acts as a dedicated data layer for the **Deepthought Server**, allowing the server's multi-agent engine (AG2) to "see" and "map" Kolibri resources with high fidelity.
 
 ## Core Mandates
-1. **Pure Kolibri Ingestion**: Anchor all curriculum logic to native Kolibri Topic Trees and ContentNodes. Purge external bureaucratic standards (TEKS, etc.) in favor of the inherent pedagogical structure of the curated content.
-2. **Multi-Agent Reasoning**: Utilize LangGraph to coordinate a "Roundtable" of specialized agents (Librarian, Assessor, Foreman) to synthesize lesson plans.
-3. **Hybrid Topology**: 
-    - **KuzuDB**: Manages the rigid, hierarchical structure (Topic Trees) and prerequisites.
-    - **LanceDB**: Manages the fluid, semantic memory (Transcripts and Vectors) for RAG.
-4. **Flow**: Operate under a strict **Spec -> TDD -> Implementation** cycle managed by the LangGraph orchestrator.
+1. **Pure Kolibri Ingestion**: Anchor all curriculum logic to native Kolibri Topic Trees and ContentNodes. 
+2. **Standalone Repository**: Maintain a dedicated instance of KuzuDB (Topology) and LanceDB (Semantic Memory) specifically for Kolibri ground truth.
+3. **Retrieval Service**: Provide a robust "Librarian" interface for external consumers (like Deepthought Server) to query the Kolibri Graph and Vector space.
+4. **Separation of Concerns**: The Bridge handles **Data and Retrieval**; the Deepthought Server handles **Reasoning and Orchestration**.
 
 ## Architectural Components
 
@@ -19,20 +17,19 @@ The **dt-bridge** (Frontal Lobe) is the high-rank orchestrator of the Deepthough
 - **KolibriTopicExtractor**: Recursively traverses Kolibri's channel SQLite databases to build the KuzuDB graph.
 - **TranscriptVectorizer**: Locates `.vtt` transcripts in Kolibri's content storage, chunks them, and ingests them into LanceDB vector stores.
 
-### 2. The Agent Roundtable (`src/dt_bridge/agents/`)
-- **The Librarian**: Queries LanceDB for the exact semantic context (transcripts, vocabulary) required for a lesson.
-- **The Assessor**: Analyzes student telemetry (synced from The Backpack) to identify cognitive gaps.
-- **The Foreman**: Coordinates with the Factory Forge (Desktop PC) to generate bespoke S.T.E.A.M. coding sandboxes.
+### 2. The Librarian Service (`src/dt_bridge/retrieval/`)
+- **Graph Traversal**: Tools to query KuzuDB for parent/child relationships, prerequisite mappings, and topic clusters.
+- **Semantic Search**: Tools to query LanceDB for relevant transcript chunks based on student objectives.
+- **Metadata Provider**: Returns strictly validated `dt-contracts` objects for Kolibri resources.
 
 ### 3. Middleware Contract (`dt-contracts`)
-- Every output from the Frontal Lobe must strictly adhere to the `HybridLessonPlan` Pydantic models.
-- Ensures cross-node compatibility between the Mac Studio, PC Forge, and Chromebook Backpacks.
+- Every output from the Bridge must strictly adhere to the `dt-contracts` models to ensure the main server can ingest them without transformation.
 
 ## Data Flow
-1. **Sync In**: Ingest Kolibri DBs and Backpack Telemetry.
-2. **Transform**: Update KuzuDB topology and LanceDB vector space.
-3. **Reason**: LangGraph Roundtable evaluates the student's edge and the curriculum ground truth.
-4. **Sync Out**: Distribute `HybridLessonPlan` JSON payloads to edge devices.
+1. **Bridge** extracts Kolibri metadata and text.
+2. **Bridge** populates its internal KuzuDB/LanceDB stores.
+3. **Deepthought Server** queries the Bridge Librarian tool during agent workflows.
+4. **Deepthought Server** maps the returned Kolibri resources into its own lesson plans.
 
 ## Roadmap (Immediate Phase)
 - [x] Initialize Git and GitHub Repository.
