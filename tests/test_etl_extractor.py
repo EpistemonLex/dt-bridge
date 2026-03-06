@@ -1,117 +1,112 @@
-import sqlite3
-import pytest
-import kuzu
-import os
-from pathlib import Path
-from dt_bridge.etl.kolibri_extractor import KolibriTopicExtractor
-from dt_bridge.etl.transcript_vectorizer import TranscriptVectorizer
+"""Test suite for dt-bridge ETL."""
 
-@pytest.fixture
-def mock_kolibri_db(tmp_path: Path) -> Path:
-    db_path = tmp_path / "mock_channel.sqlite3"
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    # Create content_contentnode table
-    cursor.execute("""
-        CREATE TABLE content_contentnode (
-            id VARCHAR(32) PRIMARY KEY,
-            parent_id VARCHAR(32),
-            channel_id VARCHAR(32),
-            kind VARCHAR(20),
-            title VARCHAR(200),
-            description TEXT,
-            content_id VARCHAR(32),
-            available BOOLEAN,
-            sort_order FLOAT
-        )
-    """)
-    
-    # Insert some mock data: Root Topic -> Subtopic -> Video
-    nodes = [
-        # id, parent_id, channel_id, kind, title, description, content_id, available, sort_order
-        ("root", None, "chan1", "topic", "Root Topic", "The root", "root_cid", True, 1.0),
-        ("sub1", "root", "chan1", "topic", "Subtopic 1", "First sub", "sub1_cid", True, 1.0),
-        ("vid1", "sub1", "chan1", "video", "Video 1", "A video", "vid1_cid", True, 1.0),
-        ("vid2", "sub1", "chan1", "video", "Video 2", "Another video", "vid2_cid", True, 2.0),
-    ]
-    
-    cursor.executemany("""
-        INSERT INTO content_contentnode 
-        (id, parent_id, channel_id, kind, title, description, content_id, available, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, nodes)
-    
-    conn.commit()
-    conn.close()
-    return db_path
+import sqlite3
+from pathlib import Path
+from typing import cast
+
+import kuzu
+import pytest
+
+from dt_bridge.etl.kolibri_extractor import KolibriTopicExtractor
+from dt_bridge.etl.transcript_vectorizer import KolibriFileMetadata, TranscriptVectorizer
+
 
 @pytest.fixture
 def kuzu_db(tmp_path: Path) -> kuzu.Database:
+    """Initialize a mock KuzuDB."""
     db_path = tmp_path / "kuzu_test"
     return kuzu.Database(str(db_path))
 
-@pytest.fixture
-def mock_kolibri_content(tmp_path: Path) -> Path:
-    storage_dir = tmp_path / "storage"
-    # c1 = "a", c2 = "b", checksum = "abcd123"
-    vtt_dir = storage_dir / "a" / "b"
-    vtt_dir.mkdir(parents=True)
-    vtt_file = vtt_dir / "abcd123.vtt"
-    vtt_file.write_text("""WEBVTT
-
-00:00:01.000 --> 00:00:05.000
-This is a transcript about gravity.
-
-00:00:06.000 --> 00:00:10.000
-Gravity pulls objects together.
-""")
-    return tmp_path
 
 def test_kolibri_topic_extractor(mock_kolibri_db: Path, kuzu_db: kuzu.Database) -> None:
+    """Test the KolibriTopicExtractor."""
     conn = kuzu.Connection(kuzu_db)
     extractor = KolibriTopicExtractor(str(mock_kolibri_db), conn)
-    
+
     # Run extraction
     extractor.extract_and_load()
-    
+
     # Verify ContentNode vertices
-    result = conn.execute("MATCH (n:ContentNode) RETURN n.id, n.title, n.kind ORDER BY n.id")
-    rows = []
+    query_result = conn.execute("MATCH (n:ContentNode) RETURN n.id, n.title, n.kind ORDER BY n.id")
+    result = cast("kuzu.QueryResult", query_result)
+    rows: list[list[str]] = []
     while result.has_next():
-        rows.append(result.get_next())
-    
+        row = result.get_next()
+        rows.append([str(x) for x in row])
+
     assert len(rows) == 4
     assert rows[0][0] == "root"
     assert rows[0][1] == "Root Topic"
     assert rows[0][2] == "topic"
-    
+
     # Verify Parent-Child relationships
-    result = conn.execute("MATCH (p:ContentNode)-[:HAS_CHILD]->(c:ContentNode) RETURN p.id, c.id")
-    rels = []
+    query_result = conn.execute("MATCH (p:ContentNode)-[:HAS_CHILD]->(c:ContentNode) RETURN p.id, c.id")
+    result = cast("kuzu.QueryResult", query_result)
+    rels: list[list[str]] = []
     while result.has_next():
-        rels.append(result.get_next())
-    
+        row = result.get_next()
+        rels.append([str(x) for x in row])
+
     assert len(rels) == 3
     # Check if (root, sub1), (sub1, vid1), (sub1, vid2) exist
-    rel_set = set((r[0], r[1]) for r in rels)
+    rel_set = {(r[0], r[1]) for r in rels}
     assert ("root", "sub1") in rel_set
     assert ("sub1", "vid1") in rel_set
     assert ("sub1", "vid2") in rel_set
 
+
 def test_transcript_vectorizer(mock_kolibri_content: Path, tmp_path: Path) -> None:
+    """Test the TranscriptVectorizer."""
     lancedb_dir = tmp_path / "lancedb"
     vectorizer = TranscriptVectorizer(str(mock_kolibri_content), str(lancedb_dir))
-    
-    file_data = [
-        {"id": "file1", "checksum": "abcd123", "node_id": "vid1"}
+
+    file_data: list[KolibriFileMetadata] = [
+        {"id": "file1", "checksum": "abcd123", "node_id": "vid1"},
     ]
-    
+
     vectorizer.process_transcripts(file_data)
-    
+
     # Search (will do a scan if no embeddings, which is fine for test)
     assert "transcripts" in vectorizer.db.list_tables().tables
     table = vectorizer.db.open_table("transcripts")
     data = table.to_pandas()
     assert len(data) >= 1
     assert "gravity" in data.iloc[0]["text"].lower()
+
+
+def test_kolibri_topic_extractor_empty(tmp_path: Path, kuzu_db: kuzu.Database) -> None:
+    """Test extractor with empty database."""
+    db_path = tmp_path / "empty.sqlite3"
+    conn = sqlite3.connect(db_path)
+    # Need all columns used in query
+    conn.execute(
+        "CREATE TABLE content_contentnode ("
+        "id VARCHAR(32), title VARCHAR(32), kind VARCHAR(32), description TEXT, "
+        "channel_id VARCHAR(32), content_id VARCHAR(32), available BOOLEAN, parent_id VARCHAR(32))",
+    )
+    conn.close()
+
+    conn_kuzu = kuzu.Connection(kuzu_db)
+    extractor = KolibriTopicExtractor(str(db_path), conn_kuzu)
+    extractor.extract_and_load()
+
+    # Re-init should not fail (covers schema already exists paths)
+    extractor2 = KolibriTopicExtractor(str(db_path), conn_kuzu)
+    assert extractor2 is not None
+
+
+def test_transcript_vectorizer_missing_file(
+    mock_kolibri_content: Path, tmp_path: Path,
+) -> None:
+    """Test vectorizer with missing file."""
+    lancedb_dir = tmp_path / "lancedb_missing"
+    vectorizer = TranscriptVectorizer(str(mock_kolibri_content), str(lancedb_dir))
+
+    # checksum that doesn't exist
+    file_data: list[KolibriFileMetadata] = [
+        {"id": "file2", "checksum": "nonexistent", "node_id": "vid2"},
+    ]
+
+    vectorizer.process_transcripts(file_data)
+    # Table should not be created if no chunks
+    assert "transcripts" not in vectorizer.db.list_tables().tables
