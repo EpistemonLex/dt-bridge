@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "dt-bridge"
+version = "0.1.0"
+description = "Deepthought Frontal Lobe: Kolibri ETL & LangGraph Orchestrator"
+requires-python = ">=3.14"
+authors = [{name = "Epistemon", email = "charlesrobertsstudio@gmail.com"}]
+dependencies = [
+    "langgraph>=0.2.60",
+    "kuzu>=0.11.3",
+    "lancedb>=0.25.0",
+    "pandas>=2.3.0",
+    "dt-contracts",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.9.0",
+    "mypy>=1.14.0",
+]
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+ignore_missing_imports = false
+disallow_untyped_defs = true
+disallow_untyped_calls = true
+warn_return_any = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+warn_unused_ignores = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = "dt_bridge.*"
+disallow_any_explicit = true 
+
+[tool.ruff]
+line-length = 110
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "E501", "ISC001", "D203", "D213", "TRY003", "TRY300", "TRY301",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+
+[tool.uv]
+managed = true
