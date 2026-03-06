@@ -4,6 +4,7 @@ import kuzu
 import os
 from pathlib import Path
 from dt_bridge.etl.kolibri_extractor import KolibriTopicExtractor
+from dt_bridge.etl.transcript_vectorizer import TranscriptVectorizer
 
 @pytest.fixture
 def mock_kolibri_db(tmp_path: Path) -> Path:
@@ -50,6 +51,23 @@ def kuzu_db(tmp_path: Path) -> kuzu.Database:
     db_path = tmp_path / "kuzu_test"
     return kuzu.Database(str(db_path))
 
+@pytest.fixture
+def mock_kolibri_content(tmp_path: Path) -> Path:
+    storage_dir = tmp_path / "storage"
+    # c1 = "a", c2 = "b", checksum = "abcd123"
+    vtt_dir = storage_dir / "a" / "b"
+    vtt_dir.mkdir(parents=True)
+    vtt_file = vtt_dir / "abcd123.vtt"
+    vtt_file.write_text("""WEBVTT
+
+00:00:01.000 --> 00:00:05.000
+This is a transcript about gravity.
+
+00:00:06.000 --> 00:00:10.000
+Gravity pulls objects together.
+""")
+    return tmp_path
+
 def test_kolibri_topic_extractor(mock_kolibri_db: Path, kuzu_db: kuzu.Database) -> None:
     conn = kuzu.Connection(kuzu_db)
     extractor = KolibriTopicExtractor(str(mock_kolibri_db), conn)
@@ -80,3 +98,20 @@ def test_kolibri_topic_extractor(mock_kolibri_db: Path, kuzu_db: kuzu.Database) 
     assert ("root", "sub1") in rel_set
     assert ("sub1", "vid1") in rel_set
     assert ("sub1", "vid2") in rel_set
+
+def test_transcript_vectorizer(mock_kolibri_content: Path, tmp_path: Path) -> None:
+    lancedb_dir = tmp_path / "lancedb"
+    vectorizer = TranscriptVectorizer(str(mock_kolibri_content), str(lancedb_dir))
+    
+    file_data = [
+        {"id": "file1", "checksum": "abcd123", "node_id": "vid1"}
+    ]
+    
+    vectorizer.process_transcripts(file_data)
+    
+    # Search (will do a scan if no embeddings, which is fine for test)
+    assert "transcripts" in vectorizer.db.list_tables().tables
+    table = vectorizer.db.open_table("transcripts")
+    data = table.to_pandas()
+    assert len(data) >= 1
+    assert "gravity" in data.iloc[0]["text"].lower()

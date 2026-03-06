@@ -58,7 +58,10 @@ quote-style = "double"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore:Core Pydantic V1 functionality isn't compatible with Python 3.14:UserWarning",
+]
 
 [tool.coverage.report]
 fail_under = 90
@@ -66,3 +69,6 @@ show_missing = true
 
 [tool.uv]
 managed = true
+
+[tool.uv.sources]
+dt-contracts = { path = "../dt-contracts", editable = true }
