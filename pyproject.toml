@@ -60,7 +60,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "INP001", "D100", "D103", "ANN201", "PLR2004", "TC003"]
-"src/dt_bridge/agents/librarian.py" = ["TC001"]
+"src/dt_bridge/agents/*" = ["TC001"]
+"src/dt_bridge/etl/*" = ["TC001"]
+"src/dt_bridge/agents/state.py" = ["TC001", "TC002"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

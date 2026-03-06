@@ -3,22 +3,8 @@
 import operator
 from typing import Annotated, TypedDict
 
-
-class StudentProfile(TypedDict):
-    """Represents the cognitive assessment of a student."""
-
-    node_id: str
-    mastery_score: float
-    struggles: list[str]
-    last_sync: str
-
-
-class LessonPlan(TypedDict):
-    """Represents a generated HybridLessonPlan payload."""
-
-    plan_id: str
-    nodes: list[str]
-    config: dict[str, str]
+from dt_contracts.lesson_plan import HybridLessonPlan
+from dt_contracts.telemetry import TelemetryLog
 
 
 class AgentState(TypedDict):
@@ -30,11 +16,11 @@ class AgentState(TypedDict):
     # Context retrieved from Kolibri/LanceDB
     context: Annotated[list[str], operator.add]
 
-    # Cognitive assessment of the student
-    student_profile: StudentProfile
+    # Raw telemetry synced from the student device
+    telemetry: list[TelemetryLog]
 
-    # The generated lesson plan or output
-    output: LessonPlan
-
-    # Tracking which agents have run
+    # Internal reasoning and logs
     history: Annotated[list[str], operator.add]
+
+    # The final generated payload
+    output: HybridLessonPlan | None

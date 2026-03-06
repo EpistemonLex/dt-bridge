@@ -7,9 +7,11 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
+from dt_contracts.telemetry import ActionType, TelemetryLog
 from langgraph.graph import END, StateGraph
 
 from dt_bridge.agents.librarian import LibrarianNode
+from dt_bridge.agents.roundtable import create_roundtable
 from dt_bridge.agents.state import AgentState
 from dt_bridge.etl.transcript_vectorizer import KolibriFileMetadata, TranscriptVectorizer
 
@@ -31,46 +33,32 @@ def mock_vectorizer(tmp_path: Path) -> TranscriptVectorizer:
                 "checksum": "abc",
                 "vector": rng.random(128).astype(np.float32),
             },
-            {
-                "id": "v1_1",
-                "node_id": "v1",
-                "text": "Sir Isaac Newton formulated the universal law of gravitation.",
-                "checksum": "abc",
-                "vector": rng.random(128).astype(np.float32),
-            },
         ],
     )
     vectorizer.db.create_table("transcripts", data=df)
     return vectorizer
 
 
-def test_librarian_node(mock_vectorizer: TranscriptVectorizer) -> None:
-    """Test the Librarian agent node."""
-    # Build a simple graph
-    workflow = StateGraph(AgentState)
-
-    librarian = LibrarianNode(mock_vectorizer)
-    workflow.add_node("librarian", librarian)
-    workflow.set_entry_point("librarian")
-    workflow.add_edge("librarian", END)
-
+def test_roundtable_full_flow(mock_vectorizer: TranscriptVectorizer) -> None:
+    """Test the full Roundtable multi-agent flow."""
+    workflow = create_roundtable(mock_vectorizer)
     app = workflow.compile()
 
-    # Initial state
+    # Initial state with some telemetry
     initial_state: AgentState = {
         "objective": "gravitation",
         "context": [],
-        "student_profile": {
-            "node_id": "vid1",
-            "mastery_score": 0.0,
-            "struggles": [],
-            "last_sync": "2026-03-06",
-        },
-        "output": {"plan_id": "p1", "nodes": [], "config": {}},
+        "telemetry": [
+            TelemetryLog(student_id="s1", action_type=ActionType.COMPILATION_ERROR, timestamp="2026-03-06T10:00:00", details={"err": "syntax"}),
+            TelemetryLog(student_id="s1", action_type=ActionType.COMPILATION_ERROR, timestamp="2026-03-06T10:01:00", details={"err": "syntax"}),
+            TelemetryLog(student_id="s1", action_type=ActionType.COMPILATION_ERROR, timestamp="2026-03-06T10:02:00", details={"err": "syntax"}),
+            TelemetryLog(student_id="s1", action_type=ActionType.COMPILATION_ERROR, timestamp="2026-03-06T10:03:00", details={"err": "syntax"}),
+        ],
         "history": [],
+        "output": None,
     }
 
-    # Patch the search method to avoid real vector search in tests
+    # Patch the search method
     with patch.object(
         mock_vectorizer,
         "search",
@@ -78,14 +66,15 @@ def test_librarian_node(mock_vectorizer: TranscriptVectorizer) -> None:
             [{"text": "Gravity is the force that pulls objects toward each other."}],
         ),
     ):
-        # Run the graph
-        # cast to satisfy complex StateT binding in langgraph
         invoke_result = app.invoke(cast("Any", initial_state))  # architectural: allowed-object (Satisfy langgraph Pregel.invoke type hint)
         final_state = cast("AgentState", invoke_result)
 
-    assert "context" in final_state
-    assert "history" in final_state
-    assert any("Librarian:" in h for h in final_state["history"])
+    assert len(final_state["context"]) > 0
+    assert any("Assessor: Detected 4 compilation errors" in h for h in final_state["history"])
+    assert any("Foreman: Generated HybridLessonPlan" in h for h in final_state["history"])
+    assert final_state["output"] is not None
+    assert final_state["output"].title == "Lesson: gravitation"
+    assert len(final_state["output"].steps) == 2
 
 
 def test_librarian_node_empty_objective(mock_vectorizer: TranscriptVectorizer) -> None:
@@ -100,13 +89,8 @@ def test_librarian_node_empty_objective(mock_vectorizer: TranscriptVectorizer) -
     initial_state: AgentState = {
         "objective": "",
         "context": [],
-        "student_profile": {
-            "node_id": "vid1",
-            "mastery_score": 0.0,
-            "struggles": [],
-            "last_sync": "2026-03-06",
-        },
-        "output": {"plan_id": "p1", "nodes": [], "config": {}},
+        "telemetry": [],
+        "output": None,
         "history": [],
     }
 
