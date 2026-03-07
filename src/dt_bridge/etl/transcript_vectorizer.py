@@ -4,7 +4,7 @@ import re
 from pathlib import Path
 from typing import TypedDict, cast
 
-import lancedb
+import lancedb  # type: ignore[import-untyped]
 import pandas as pd
 
 

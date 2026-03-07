@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, cast
 import kuzu
 
 if TYPE_CHECKING:
-    from dt_bridge.etl.transcript_vectorizer import TranscriptVectorizer
+    from dt_bridge.interfaces import ITranscriptVectorizer
 
 
 class Librarian:
@@ -14,11 +14,11 @@ class Librarian:
     Knowledge Graph (KuzuDB) and Semantic Memory (LanceDB).
     """
 
-    def __init__(self, kuzu_conn: kuzu.Connection, vectorizer: TranscriptVectorizer) -> None:
+    def __init__(self, kuzu_conn: kuzu.Connection, vectorizer: ITranscriptVectorizer) -> None:
         """Initialize the Librarian.
 
         :param kuzu_conn: Connection to the Kolibri KuzuDB instance.
-        :param vectorizer: Instance of TranscriptVectorizer for semantic search.
+        :param vectorizer: Instance of ITranscriptVectorizer for semantic search.
         """
         self.kuzu_conn = kuzu_conn
         self.vectorizer = vectorizer

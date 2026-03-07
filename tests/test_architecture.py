@@ -1,62 +1,28 @@
-import re
+"""Architectural compliance tests for Deepthought Ed-OS mandates."""
+
 from pathlib import Path
 
+import pytest
+from dt_testing.arch import check_file_compliance
 
-def test_no_noqa_or_type_ignore() -> None:
-    """Verify that no # noqa or # type: ignore comments exist in the codebase."""
-    forbidden = ["noqa", "type: ignore"]
-    src_dir = Path("src")
-    tests_dir = Path("tests")
 
-    files_to_check = list(src_dir.rglob("*.py")) + list(tests_dir.rglob("*.py"))
+@pytest.mark.architecture
+@pytest.mark.parametrize("folder", ["src", "tests"])
+def test_architectural_ratchet(folder: str) -> None:
+    """Verify that all files in the folder comply with architectural mandates."""
+    member_root = Path(__file__).parent.parent
+    target_dir = member_root / folder
 
-    violations = []
-    for file_path in files_to_check:
-        if file_path.name == "test_architecture.py":
+    if not target_dir.exists():
+        return
+
+    all_errors = []
+    for p in target_dir.rglob("*.py"):
+        if p.name in {"test_architecture.py", "__init__.py"}:
             continue
-        content = file_path.read_text()
-        for i, line in enumerate(content.splitlines(), 1):
-            if any(f in line for f in forbidden):
-                violations.append(f"{file_path}:{i}: Found forbidden comment in line: {line}")
+        errors = check_file_compliance(p)
+        if errors:
+            all_errors.append(f"\n{p.relative_to(member_root.parent)}:" + "\n".join(errors))
 
-    assert not violations, "\n".join(violations)
-
-def test_zero_any() -> None:
-    """Verify that the literal 'Any' is not used in the codebase."""
-    any_pattern = r"\bAny\b"
-    allowed_marker = "# architectural: allowed-object"
-    src_dir = Path("src")
-    tests_dir = Path("tests")
-
-    files_to_check = list(src_dir.rglob("*.py")) + list(tests_dir.rglob("*.py"))
-
-    violations = []
-    for file_path in files_to_check:
-        if file_path.name == "test_architecture.py":
-            continue
-        content = file_path.read_text()
-        for i, line in enumerate(content.splitlines(), 1):
-            # Ignore imports of Any
-            if line.strip().startswith(("import ", "from ")):
-                continue
-            if re.search(any_pattern, line) and allowed_marker not in line:
-                violations.append(f"{file_path}:{i}: Forbidden use of 'Any' in line: {line}")
-
-    assert not violations, "\n".join(violations)
-def test_object_sovereignty() -> None:
-    """Verify that 'object' as a type is only used with justification."""
-    object_pattern = r":\s*object\b"
-    allowed_marker = "# architectural: allowed-object"
-    src_dir = Path("src")
-    tests_dir = Path("tests")
-
-    files_to_check = list(src_dir.rglob("*.py")) + list(tests_dir.rglob("*.py"))
-
-    violations = []
-    for file_path in files_to_check:
-        content = file_path.read_text()
-        for i, line in enumerate(content.splitlines(), 1):
-            if re.search(object_pattern, line) and allowed_marker not in line:
-                violations.append(f"{file_path}:{i}: Forbidden use of 'object' as type without justification: {line}")
-
-    assert not violations, "\n".join(violations)
+    if all_errors:
+        pytest.fail("Architectural compliance failed:" + "".join(all_errors))

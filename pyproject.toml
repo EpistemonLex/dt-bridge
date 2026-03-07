@@ -67,6 +67,9 @@ ignore = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "architecture: architectural compliance tests",
+]
 filterwarnings = [
     "error",
     "ignore:Core Pydantic V1 functionality isn't compatible with Python 3.14:UserWarning",
@@ -80,4 +83,5 @@ show_missing = true
 managed = true
 
 [tool.uv.sources]
-dt-contracts = { path = "../dt-contracts", editable = true }
+dt-contracts = { workspace = true }
+dt-testing = { workspace = true }
