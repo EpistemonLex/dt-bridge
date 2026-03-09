@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "dt-bridge"
 version = "0.1.0"
 description = "Deepthought Frontal Lobe: Kolibri ETL & LangGraph Orchestrator"
-requires-python = ">=3.14"
+requires-python = ">=3.12,<3.13"
 authors = [{name = "Epistemon", email = "charlesrobertsstudio@gmail.com"}]
 dependencies = [
     "langgraph>=0.2.60",

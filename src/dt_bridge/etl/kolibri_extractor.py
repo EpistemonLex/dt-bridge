@@ -17,11 +17,13 @@ class KolibriTopicExtractor:
     Maps the hierarchy into a KuzuDB graph.
     """
 
-    def __init__(self, kolibri_db_path: str, kuzu_conn: kuzu.Connection) -> None:
+    def __init__(self, kolibri_db_path: str, kuzu_conn: "kuzu.Connection") -> None:
         """Initialize the extractor.
 
-        :param kolibri_db_path: Path to the Kolibri channel SQLite file.
-        :param kuzu_conn: KuzuDB connection object.
+        Args:
+            kolibri_db_path: Path to the Kolibri channel SQLite file.
+            kuzu_conn: KuzuDB connection object.
+
         """
         self.kolibri_db_path = kolibri_db_path
         self.kuzu_conn = kuzu_conn
