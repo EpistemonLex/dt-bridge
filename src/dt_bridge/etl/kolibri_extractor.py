@@ -1,5 +1,7 @@
 """Kolibri Topic Tree extraction and KuzuDB loading."""
 
+from __future__ import annotations
+
 import sqlite3
 import tempfile
 from pathlib import Path
@@ -17,7 +19,7 @@ class KolibriTopicExtractor:
     Maps the hierarchy into a KuzuDB graph.
     """
 
-    def __init__(self, kolibri_db_path: str, kuzu_conn: "kuzu.Connection") -> None:
+    def __init__(self, kolibri_db_path: str, kuzu_conn: kuzu.Connection) -> None:
         """Initialize the extractor.
 
         Args:
